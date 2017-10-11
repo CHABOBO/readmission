@@ -9,4 +9,4 @@ Use of Machine Learning techniques to study hospital readmissions on patients wi
 * 04 --> Run experiments
 * 05 --> Explore results
 
-Tools: python, scikit-learn, matplotlib, seaborn
+Tools: python, scikit-learn, matplotlib, seaborn, notebook
