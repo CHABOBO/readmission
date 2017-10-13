@@ -325,19 +325,23 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
 
                 #Compute test score
                 y_pred = grid_pipeline.best_estimator_.predict(X_test)
-                test_f1 = metrics.f1_score(y_test, y_pred, average='weighted', pos_label=None)
-                test_prec = metrics.recall_score(y_test, y_pred, average='weighted', pos_label=None)
-                test_rec = metrics.precision_score(y_test, y_pred, average='weighted', pos_label=None)
-                test_auc = metrics.roc_auc_score(y_test, y_pred, average='weighted')
+                test_f1_w = metrics.f1_score(y_test, y_pred, average='weighted', pos_label=None)
+                test_prec_w = metrics.recall_score(y_test, y_pred, average='weighted', pos_label=None)
+                test_rec_w = metrics.precision_score(y_test, y_pred, average='weighted', pos_label=None)
+                test_auc_w = metrics.roc_auc_score(y_test, y_pred, average='weighted')
                 cm = metrics.confusion_matrix(y_test, y_pred)
+                fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
+                test_auc = metrics.auc(fpr, tpr)
                 tn = cm[0,0]
                 fp = cm[0,1]
                 fn = cm[1,0]
                 tp = cm[1,1]
 
-                print "\nTest f1: %0.3f" % (test_f1)
-                print "Test Precision: %0.3f" % (test_prec)
-                print "Test Recall (Sensitivity): %0.3f" % (test_rec)
+                print "\nTest f1 (weighted): %0.3f" % (test_f1_w)
+                print "Test Precision (weighted): %0.3f" % (test_prec_w)
+                print "Test Recall / Sensitivity (weighted): %0.3f" % (test_rec_w)
+                print "Test AUC (weighted): %0.3f" % (test_auc_w)
+                print "Test Sensitivity: %0.3f" % (tp / float(tp + fn))
                 print "Test Specificity: %0.3f" % (tn / float(tn + fp))
                 print "Test AUC: %0.3f" % (test_auc)
                 print 
@@ -347,7 +351,7 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
 
                 end = time.time()
                 print "\nTotal time:", end - start
-                results = [num_exp,
+                res = [num_exp,
                                disease,
                                typeEncounter,
                                typeHypothesis,
@@ -368,17 +372,18 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                                np.std(cv_prec),
                                np.mean(cv_rec), 
                                np.std(cv_rec),                    
-                               test_f1,
-                               test_prec,
-                               test_rec,
-                               test_auc,                    
+                               test_f1_w,
+                               test_prec_w,
+                               test_rec_w,
+                               test_auc_w,                    
                                end - start,
                                grid_pipeline.best_estimator_
                               ]
+                results.append(res)
 
                 #Save results
                 if save:
-                    df = pd.DataFrame(np.array(results).reshape(1,27), columns=
+                    df = pd.DataFrame(np.array(res).reshape(1,27), columns=
                           ["exp", "typeDisease","typeEncounter","typeHypothesis","typeDataFeatures","typeDiagnosis",
                            "size_tr","fs","sm","cls","metric","params",
                            "tr_f1","tr_prec","tr_rec",
@@ -401,4 +406,4 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                                           str(lm) + '_' +
                                           str(cls) + '_' +
                                           '.pkl'))
-
+    return results
