@@ -4,7 +4,7 @@ import numpy as np
 import csv
 from sklearn import metrics
 from sklearn.preprocessing import scale
-from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import VarianceThreshold, SelectFromModel, RFE
 from sklearn.cross_validation import StratifiedShuffleSplit, cross_val_score
 
 from sklearn.svm import SVC
@@ -39,10 +39,11 @@ from TypeFeatImputer import TypeFeatImputer
 from UnivCombineFilter import UnivCombineFilter
 
 def load_data(typeEncounter, typeDiagnosis, typeDataFeatures):
-    if typeDataFeatures == "minimum":
-        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '.pkl'))
+
     if typeDataFeatures == "extended":
         df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '_' + typeDataFeatures + '.pkl'))
+    else:
+        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '.pkl'))
 
     return df_all
 
@@ -112,13 +113,14 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
         for sm_type in sm_types:
             for cls_method in cls_methods:
                 for lm in lms:
-                    if not (fs_method == "rfe_rf_fs" and cls_method == "rf"):
+                    if not (fs_method == "rfe_rf_fs" and cls_method == "rf") and not(fs_method == "lasso_fs" and cls_method == "logReg"):
                         params = {}   
                         pipe = Pipeline(list(basePipeline.steps))
 
                         if fs_method == "combine_fs":
                             pipe.steps.insert(1,(fs_method, UnivCombineFilter(catCols,np.array(reducedCols))))
                             params.update({fs_method + '__percentile':[5,10,20,30,40,50]})
+
 
                         if fs_method == "rfe_rf_fs":
                             pipe.steps.append((fs_method, RFE(estimator=RandomForestClassifier(class_weight='balanced',
@@ -154,7 +156,7 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
 
                         if cls_method == "rf":
                             pipe.steps.append((cls_method, RandomForestClassifier(n_jobs=-1,class_weight='balanced',random_state=42)))
-                            params.update({'rf__n_estimators': [150,200,250,300,350,400], 
+                            params.update({'rf__n_estimators': [200,250,300,350,400,500],
                                            'rf__criterion': ['entropy','gini'],
                                            'rf__max_depth' : [None,8,10,12]})
 
@@ -250,7 +252,7 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
     for tr_thr in tr_thrs:
         for disease in diseases:
 
-            df_all_filtered = filter_data_by_diseases(df_all, disease, typeDataExperiment, colsNonDiseases)               
+            df_all_filtered = filter_data_by_diseases(df_all, disease, typeDataExperiment, colsNonDiseases)
             X_train, X_test, y_train, y_test = train_test_partition(df_all_filtered, ts_thr)
             X_train, y_train = train_partition(X_train, y_train, tr_thr)
 

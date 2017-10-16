@@ -1,0 +1,31 @@
+{
+	"fs": [{
+			"combine_fs__percentile": [5, 10, 20, 30, 40, 50]
+		},
+		{
+			"rfe_rf_fs__step": [0.1],
+			"rfe_rf_fs__n_features_to_select": [0.4, 0.6, 0.8]
+		},
+		{
+			"lasso_fs__estimator__C": [0.001, 0.01, 0.1, 1]
+		}
+	],
+	"cls": [{
+			"knn__n_neighbors": [1, 3, 5, 7, 9, 11],
+			"knn__weights": ["uniform", "distance"]
+		},
+		{
+			"logReg__C": [0.00001, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 15, 30],
+			"logReg__class_weight": ["balanced"],
+			"logReg__penalty": ["l1", "l2"]
+		},
+		{
+			"svmRBF__C": [0.01, 0.1, 0.5, 1, 5, 10, 30, 50, 100],
+			"svmRBF__gamma": [0.0001, 0.001, 0.01, 0.1, 1, 5]
+		}, {
+			"rf__n_estimators": [200, 250, 300, 350, 400, 500],
+			"rf__criterion": ["entropy", "gini"],
+			"rf__max_depth": [8, 10, 12]
+		}
+	]
+}
