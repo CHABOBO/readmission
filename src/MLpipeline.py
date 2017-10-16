@@ -11,7 +11,7 @@ from sklearn.svm import SVC
 from sklearn.svm import LinearSVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB, GaussianNB
 
 from sklearn.grid_search import GridSearchCV, ParameterGrid
@@ -153,11 +153,16 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
                             params.update({'svmRBF__class_weight': [None, 'balanced']})
 
                         if cls_method == "rf":
-                            pipe.steps.append((cls_method, RandomForestClassifier(n_jobs=-1,random_state=42)))
-                            params.update({'rf__n_estimators': [100,150,200,250,500], 
+                            pipe.steps.append((cls_method, RandomForestClassifier(n_jobs=-1,class_weight='balanced',random_state=42)))
+                            params.update({'rf__n_estimators': [150,200,250,300,350,400], 
                                            'rf__criterion': ['entropy','gini'],
-                                           'rf__max_depth' : [None,4,6]})
-                            params.update({'rf__class_weight': [None, 'balanced']})
+                                           'rf__max_depth' : [None,8,10,12]})
+
+                        if cls_method == "gbt":
+                            pipe.steps.append((cls_method, GradientBoostingClassifier(random_state=42,subsample=0.1,loss="deviance")))
+                            params.update({'gbt__n_estimators': [300,400,500],
+                                           'gbt__learning_rate': [0.1,0.01,0.001],
+                                           'gbt__max_depth' : [None,8,10,12]})
 
                         if cls_method == "nb":
                              pipe.steps.append((cls_method, GaussianNB()))
@@ -200,7 +205,8 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
 def compute_type_features(df_all, typeDataFeatures):
 
     numCols = ['time_in_hospital','num_lab_procedures', 'num_procedures', 'num_medications', 'number_outpatient', 
-                'number_emergency', 'number_inpatient', 'number_diagnoses','number_treatment']
+                'number_emergency', 'number_inpatient', 'number_diagnoses',
+                'number_treatment','number_treatment_0','number_treatment_1','number_treatment_2','number_treatment_3']
 
     catCols = []
     cols = df_all.columns
@@ -340,7 +346,8 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                 print "Test Precision (weighted): %0.3f" % (test_prec_w)
                 print "Test Recall / Sensitivity (weighted): %0.3f" % (test_rec_w)
                 print "Test AUC (weighted): %0.3f" % (test_auc_w)
-                print "Test Sensitivity: %0.3f" % (tp / float(tp + fn))
+                print
+                print "Test Recall / Sensitivity: %0.3f" % (tp / float(tp + fn))
                 print "Test Specificity: %0.3f" % (tn / float(tn + fp))
                 print "Test AUC: %0.3f" % (test_auc)
                 print 
