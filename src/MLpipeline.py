@@ -47,6 +47,8 @@ def load_data(typeEncounter, typeDiagnosis, typeDataFeatures):
     return df_all
 
 def get_columns(df_all, typeDiagnosis):
+
+    colsDiseases = []
     if typeDiagnosis == "diag_1":
         colsDiseases = [u'Diabetis_1', u'Circulatory_1', u'Digestive_1', u'Genitourinary_1', u'Poisoning_1', u'Muscoskeletal_1',
                u'Neoplasms_1', u'Respiratory_1']
