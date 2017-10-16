@@ -40,9 +40,9 @@ from UnivCombineFilter import UnivCombineFilter
 
 def load_data(typeEncounter, typeDiagnosis, typeDataFeatures):
     if typeDataFeatures == "minimum":
-        df_all=pd.read_pickle(os.path.join('resources','clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '_hyp_1.pkl'))
+        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '.pkl'))
     if typeDataFeatures == "extended":
-        df_all=pd.read_pickle(os.path.join('resources','clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '_hyp_1_' + typeDataFeatures + '.pkl'))
+        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '_' + typeDataFeatures + '.pkl'))
 
     return df_all
 
@@ -196,12 +196,9 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
     return pipelines
 
 def compute_type_features(df_all, typeDataFeatures):
-    if typeDataFeatures == "minimum":
-        numCols = ['time_in_hospital']
 
-    if typeDataFeatures == "extended":
-        numCols = ['time_in_hospital','num_lab_procedures', 'num_procedures', 'num_medications', 'number_outpatient', 
-                'number_emergency', 'number_inpatient', 'number_diagnoses']
+    numCols = ['time_in_hospital','num_lab_procedures', 'num_procedures', 'num_medications', 'number_outpatient', 
+                'number_emergency', 'number_inpatient', 'number_diagnoses','number_treatment']
 
     catCols = []
     cols = df_all.columns
