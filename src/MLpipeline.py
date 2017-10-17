@@ -40,10 +40,11 @@ from UnivCombineFilter import UnivCombineFilter
 
 def load_data(typeEncounter, typeDiagnosis, typeDataFeatures):
 
-    if typeDataFeatures == "extended":
-        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '_' + typeDataFeatures + '.pkl'))
+    if typeDataFeatures == "non_extended":
+        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis + '.pkl'))
     else:
-        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis+ '.pkl'))
+        df_all=pd.read_pickle(os.path.join('resources','prepared_clean_data_' + typeEncounter + "_" +  typeDiagnosis + '_' + typeDataFeatures + '.pkl'))
+
 
     return df_all
 
@@ -156,9 +157,9 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
 
                         if cls_method == "rf":
                             pipe.steps.append((cls_method, RandomForestClassifier(n_jobs=-1,class_weight='balanced',random_state=42)))
-                            params.update({'rf__n_estimators': [200,250,300,350,400,500],
+                            params.update({'rf__n_estimators': [100,150,200,250,300,350,400,500],
                                            'rf__criterion': ['entropy','gini'],
-                                           'rf__max_depth' : [None,8,10,12]})
+                                           'rf__max_depth' : [None,4,6,8,10,12]})
 
                         if cls_method == "gbt":
                             pipe.steps.append((cls_method, GradientBoostingClassifier(random_state=42,subsample=0.1,loss="deviance")))
@@ -199,6 +200,7 @@ def create_pipelines(catCols,reducedCols, fs_methods, sm_method, sm_types, cls_m
 
 
                         pipeline.append([fs_method,sm_type,cls_method,lm,pipe_imb,params])
+
     pipelines = pd.DataFrame(pipeline, columns=["fs","sm","cls","metric","pipe","pipe_params"])
     pipelines.sort_values("fs", inplace=True)
     print pipelines.shape
@@ -208,6 +210,7 @@ def compute_type_features(df_all, typeDataFeatures):
 
     numCols = ['time_in_hospital','num_lab_procedures', 'num_procedures', 'num_medications', 'number_outpatient', 
                 'number_emergency', 'number_inpatient', 'number_diagnoses',
+                'add_in_out', 'add_procs_meds', 'div_visits_time', 'div_em_time', 'div_visit_med', 'div_em_med',
                 'number_treatment','number_treatment_0','number_treatment_1','number_treatment_2','number_treatment_3']
 
     catCols = []
@@ -339,6 +342,9 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                 cm = metrics.confusion_matrix(y_test, y_pred)
                 fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
                 test_auc = metrics.auc(fpr, tpr)
+                test_spec = tn / float(tn + fp)
+                test_rec = tp / float(tp + fn)
+                test_prec = tp / float(tp + fp) 
                 tn = cm[0,0]
                 fp = cm[0,1]
                 fn = cm[1,0]
@@ -349,8 +355,9 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                 print "Test Recall / Sensitivity (weighted): %0.3f" % (test_rec_w)
                 print "Test AUC (weighted): %0.3f" % (test_auc_w)
                 print
-                print "Test Recall / Sensitivity: %0.3f" % (tp / float(tp + fn))
-                print "Test Specificity: %0.3f" % (tn / float(tn + fp))
+                print "Test Recall / Sensitivity: %0.3f" % (test_rec)
+                print "Test Specificity: %0.3f" % (test_spec)
+                print "Test Precision: %0.3f" % (test_prec)
                 print "Test AUC: %0.3f" % (test_auc)
                 print 
                 print "with following performance in test:"
