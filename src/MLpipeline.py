@@ -340,15 +340,15 @@ def run(df_all, colsNonDiseases, diseases, typeDataFeatures, typeDataExperiment,
                 test_rec_w = metrics.precision_score(y_test, y_pred, average='weighted', pos_label=None)
                 test_auc_w = metrics.roc_auc_score(y_test, y_pred, average='weighted')
                 cm = metrics.confusion_matrix(y_test, y_pred)
+                tn = cm[0,0]
+                fp = cm[0,1]
+                fn = cm[1,0]
+                tp = cm[1,1]
                 fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
                 test_auc = metrics.auc(fpr, tpr)
                 test_spec = tn / float(tn + fp)
                 test_rec = tp / float(tp + fn)
                 test_prec = tp / float(tp + fp) 
-                tn = cm[0,0]
-                fp = cm[0,1]
-                fn = cm[1,0]
-                tp = cm[1,1]
 
                 print "\nTest f1 (weighted): %0.3f" % (test_f1_w)
                 print "Test Precision (weighted): %0.3f" % (test_prec_w)
