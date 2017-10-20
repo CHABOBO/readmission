@@ -257,7 +257,7 @@ def run(name,df_all, catCols, reducedCols, hyperparams,
                 print "TRAIN Precision [c=0,1]:", train_p
                 print "TRAIN Recall [c=0,1]:", train_r
                 print "TRAIN AUC: %0.3f" % (train_auc)                 
-                print "TRAIN Sensibility:", train_sens
+                print "TRAIN sensitivity:", train_sens
                 print "TRAIN Specificity: ", train_spec
                 
                 # Compute evaluation scores
@@ -300,7 +300,7 @@ def run(name,df_all, catCols, reducedCols, hyperparams,
                 print "CV OUTER prec score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_p0_mean,cv_p0_std,cv_p1_mean,cv_p1_std)                
                 print "CV OUTER rec  score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_r0_mean,cv_r0_std,cv_r1_mean,cv_r1_std)
                 print "CV OUTER AUC score: %0.3f  (+/-%0.03f)" % (cv_auc_mean,cv_auc_std) 
-                print "CV OUTER Sensibility score: %0.3f  (+/-%0.03f)" % (cv_sens_mean,cv_sens_std) 
+                print "CV OUTER sensitivity score: %0.3f  (+/-%0.03f)" % (cv_sens_mean,cv_sens_std) 
                 print "CV OUTER Specificity score: %0.3f  (+/-%0.03f)" % (cv_spec_mean,cv_spec_std)
                 print "Selected params (bests from CV) {}".format(grid_pipeline.best_params_.values())
                
@@ -323,7 +323,7 @@ def run(name,df_all, catCols, reducedCols, hyperparams,
                 print "TEST Precision [c=0,1]:", test_p
                 print "TEST Recall [c=0,1]:", test_r                
                 print "TEST AUC: %0.3f" % (test_auc)                
-                print "TEST Sensibility:", test_sens
+                print "TEST sensitivity:", test_sens
                 print "TEST Specificity:", test_spec
                 print "Confussion matrix:"
                 print "         | PRED"
