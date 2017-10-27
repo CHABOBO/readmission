@@ -36,6 +36,7 @@ np.set_printoptions(suppress=True)
 pd.options.display.float_format = '{:,.2f}'.format
 
 import sys
+from FeatFilter import FeatFilter
 from TypeFeatImputer import TypeFeatImputer
 from UnivCombineFilter import UnivCombineFilter
 
@@ -67,9 +68,10 @@ def train_partition(X_train, y_train, tr_thr=0.10):
 
     return X_train_aux, y_train_aux
 
-def create_pipelines(catCols,reducedCols, hyperparams, fs_methods, sm_method, sm_types, cls_methods, lms):
+def create_pipelines(catCols,reducedCols, hyperparams, fs_methods, sm_method, sm_types, cls_methods, lms, featsToFilter=None):
     
     basePipeline = Pipeline([
+            ("FeatFilter", FeatFilter(featsToFilter)),
             ("Imputer", TypeFeatImputer(catCols, reducedCols)),
             ("Scaler", StandardScaler()),
             ("Variance", VarianceThreshold(threshold=0.0))
@@ -182,219 +184,230 @@ def specificity(ground_truth, predictions):
     train_spec = tn / float(tn+fp)
     return train_spec
 
-# Execute pipelines method
-# One Experiment One file
 
-def run(name,df_all, catCols, reducedCols, hyperparams, 
-        ts_thr, tr_thrs, fs_methods, sm_method, sm_types, cls_methods, lms, cv_folds, cv_thr, 
-        verbose=True, save=False):
+# One Experiment One file
+def run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, tr_thr=1.0, ts_thr=0.3, cv_folds=5, cv_thr=0.3, verbose=True, save=True):
+    
+    results = []
+
+    print "\nDataSet:"
+    print "**********"
+    print "**********"
+    print "SIZE:", tr_thr
+    print "NAME:", name
+
+    print "ALL TRAIN:", X_train.shape
+    print "TRAIN:", "[0's:", np.sum(y_train==0), "1's:", np.sum(y_train==1), "]"
+    print "ALL TEST:", X_test.shape
+    print "TEST:", "[0's:", np.sum(y_test==0), "1's:", np.sum(y_test==1), "]"
+
+    for num_exp in range(pipeline.shape[0]):
+
+        # Run experiment
+        start = time.time()
+
+        #Prepare pipe_cls      
+        pipeline_cls = pipeline["pipe"].iloc[num_exp]
+        pipeline_params = pipeline["pipe_params"].iloc[num_exp]
+        fs = pipeline["fs"].iloc[num_exp]
+        sm = pipeline["sm"].iloc[num_exp]
+        cls = pipeline["cls"].iloc[num_exp]
+        lm = pipeline["metric"].iloc[num_exp]
+
+        print "\nNum experiment:", str(num_exp), "/", str(pipeline.shape[0] - 1)
+        print "****************"
+
+        print "FS:",fs
+        print "SM:",sm
+        print "CLS:",cls
+        print "METRIC:",lm
+
+        #Prepare cv
+        cv_inner = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=24)
+        cv_outer = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=42)
+
+        #Fit pipeline with CV                        
+        grid_pipeline = GridSearchCV(pipeline_cls, param_grid=pipeline_params, verbose=verbose, 
+                                     n_jobs=-1, cv=cv_inner, scoring= lm, error_score = 0) 
+        grid_pipeline.fit(X_train, y_train)
+
+
+        # Compute Train scores (with best CV params)
+        y_pred = grid_pipeline.best_estimator_.predict(X_train)  
+        train_f1_w = metrics.f1_score(y_train, y_pred, average='weighted', pos_label=None)
+        train_p, train_r, train_f1, train_s = metrics.precision_recall_fscore_support(y_train, y_pred,labels=None,average=None, sample_weight=None)
+        fpr, tpr, _ = metrics.roc_curve(y_train, y_pred)
+        train_auc = metrics.auc(fpr, tpr)                
+        cm_train = metrics.confusion_matrix(y_train, y_pred)
+        tn = cm_train[0,0]
+        fp = cm_train[0,1]
+        fn = cm_train[1,0]
+        tp = cm_train[1,1]
+        train_sens = train_r[1]
+        train_spec = tn / float(tn+fp)                
+        print "\nTRAIN f1 (weighted): %0.3f" % (train_f1_w)
+        print "TRAIN Precision [c=0,1]:", train_p
+        print "TRAIN Recall [c=0,1]:", train_r
+        print "TRAIN AUC: %0.3f" % (train_auc)                 
+        print "TRAIN sensitivity:", train_sens
+        print "TRAIN Specificity: ", train_spec
+
+        # Compute evaluation scores
+        print "\nCV INNER metric: {}".format(lm)
+        print "CV INNER selected params {}".format(grid_pipeline.best_params_.values())
+        print "CV INNER score: {}".format(grid_pipeline.best_score_)
+
+        scorings = {'roc_auc': 'roc_auc',
+                    'f1_weighted':'f1_weighted',
+                    'precision_1':'precision',
+                    'recall_1':'recall',
+                    'precision_0' : metrics.make_scorer(precision_0),
+                    'recall_0' : metrics.make_scorer(recall_0),
+                    'spec': metrics.make_scorer(specificity)
+                   } 
+
+        cv_scores = cross_validate(grid_pipeline.best_estimator_, X_train, y_train, 
+                                   cv=cv_outer, scoring=scorings, n_jobs=-1, 
+                                   return_train_score = False)
+
+        cv_f1_w_mean = np.mean(cv_scores["test_f1_weighted"])
+        cv_f1_w_std = np.std(cv_scores["test_f1_weighted"])
+        cv_p1_mean = np.mean(cv_scores["test_precision_1"])
+        cv_p1_std = np.std(cv_scores["test_precision_1"])
+        cv_r1_mean = np.mean(cv_scores["test_recall_1"])
+        cv_r1_std = np.std(cv_scores["test_recall_1"])                
+        cv_p0_mean = np.mean(cv_scores["test_precision_0"])
+        cv_p0_std = np.std(cv_scores["test_precision_0"])
+        cv_r0_mean = np.mean(cv_scores["test_recall_0"])
+        cv_r0_std = np.std(cv_scores["test_recall_0"])
+
+        cv_auc_mean = np.mean(cv_scores["test_roc_auc"])
+        cv_auc_std = np.std(cv_scores["test_roc_auc"])                
+        cv_spec_mean = np.mean(cv_scores["test_spec"])
+        cv_spec_std = np.std(cv_scores["test_spec"])
+        cv_sens_mean = cv_r1_mean
+        cv_sens_std = cv_r1_std
+
+        print "\nCV OUTER f1-weighted score: %0.3f  (+/-%0.03f)" % (cv_f1_w_mean,cv_f1_w_std)               
+        print "CV OUTER prec score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_p0_mean,cv_p0_std,cv_p1_mean,cv_p1_std)                
+        print "CV OUTER rec  score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_r0_mean,cv_r0_std,cv_r1_mean,cv_r1_std)
+        print "CV OUTER AUC score: %0.3f  (+/-%0.03f)" % (cv_auc_mean,cv_auc_std) 
+        print "CV OUTER sensitivity score: %0.3f  (+/-%0.03f)" % (cv_sens_mean,cv_sens_std) 
+        print "CV OUTER Specificity score: %0.3f  (+/-%0.03f)" % (cv_spec_mean,cv_spec_std)
+        print "Selected params (bests from CV) {}".format(grid_pipeline.best_params_.values())
+
+
+        #Compute test scores
+        y_pred = grid_pipeline.best_estimator_.predict(X_test)
+        test_f1_w = metrics.f1_score(y_test, y_pred, average='weighted', pos_label=None)
+        test_p, test_r, test_f1, test_s = metrics.precision_recall_fscore_support(y_test, y_pred,labels=None,average=None, sample_weight=None)
+        fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
+        test_auc = metrics.auc(fpr, tpr)                
+        cm_test = metrics.confusion_matrix(y_test, y_pred)
+        tn = cm_test[0,0]
+        fp = cm_test[0,1]
+        fn = cm_test[1,0]
+        tp = cm_test[1,1]
+        test_sens = test_r[1]
+        test_spec = tn / float(tn+fp)
+
+        print "\nTEST f1 (weighted): %0.3f" % (test_f1_w)
+        print "TEST Precision [c=0,1]:", test_p
+        print "TEST Recall [c=0,1]:", test_r                
+        print "TEST AUC: %0.3f" % (test_auc)                
+        print "TEST sensitivity:", test_sens
+        print "TEST Specificity:", test_spec
+        print "Confussion matrix:"
+        print "         | PRED"
+        print "REAL-->  v "
+        print cm_test
+
+        end = time.time()
+        print "\nTotal time:", end - start
+
+        res = [num_exp,
+               name,
+               tr_thr,
+               fs,
+               sm,
+               cls,
+               lm,
+               grid_pipeline.best_params_.values(),
+               train_sens,
+               train_spec,
+               train_auc,
+               train_r,
+               train_p,
+               train_f1_w,
+               cv_sens_mean,
+               cv_sens_std,
+               cv_spec_mean,
+               cv_spec_std,
+               cv_auc_mean,
+               cv_auc_std,
+               [cv_p0_mean,cv_p1_mean],
+               [cv_p0_std,cv_p1_std],
+               [cv_r0_mean,cv_r1_mean],
+               [cv_r1_std,cv_r0_std],
+               cv_f1_w_mean,
+               cv_f1_w_std,
+               test_sens,
+               test_spec,
+               test_auc,
+               test_r,
+               test_p,
+               test_f1_w,
+               cm_test,              
+               end - start,
+               grid_pipeline.best_estimator_
+              ]
+        results.append(res)
+
+        #Save results
+        if save:
+            df = pd.DataFrame(np.array(res).reshape(1,35), columns=
+                              ["exp", "name",
+                               "size_tr","fs","sm","cls","metric","params",
+                               "tr_sens","tr_spec","tr_auc",
+                               "tr_prec","tr_rec","tr_f1",
+                               "cv_sens_mean","cv_sens_std","cv_spec_mean","cv_spec_std","cv_auc_mean","cv_auc_std",
+                               "cv_prec_mean","cv_prec_std","cv_rec_mean","cv_rec_std",
+                               "cv_f1_mean","cv_f1_std",
+                               "test_sens","test_spec","test_auc",
+                               "test_rec","test_prec","test_f1",
+                               "cm_test",
+                               "time","pipeline"])
+
+            df.to_pickle(os.path.join("resources", "results",
+                                      'results_pipe_' + 
+                                      "test_" + str(ts_thr) + "_" +
+                                      "train_" + str(tr_thr) + "_" +
+                                      str(name) + '_' +
+                                      str(fs) + '_' +
+                                      str(sm) + '_' +
+                                      str(lm) + '_' +
+                                      str(cls) + '_' +
+                                      time.strftime("%Y%m%d-%H%M%S") +
+                                      '.pkl'))
+    return results
+
+# Execute pipelines method
+def run(name,df_all, catCols, reducedCols, hyperparams, ts_thr, tr_thrs, fs_methods, sm_method, 
+        sm_types, cls_methods, lms, cv_folds, cv_thr, verbose=True, save=False):
 
     results = []
     for tr_thr in tr_thrs:
 
-            X_train, X_test, y_train, y_test = train_test_partition(df_all, ts_thr)
-            X_train, y_train = train_partition(X_train, y_train, tr_thr)
+        #Create pipelines
+        pipeline = create_pipelines(catCols, reducedCols, hyperparams, fs_methods, sm_method, sm_types, cls_methods, lms)                    
             
-            pipeline = create_pipelines(catCols, reducedCols, hyperparams, fs_methods, sm_method, sm_types, cls_methods, lms)
+        #Partition data
+        X_train, X_test, y_train, y_test = train_test_partition(df_all, ts_thr)
+        X_train, y_train = train_partition(X_train, y_train, tr_thr)
+        y_train = y_train.astype(int)
+        y_test = y_test.astype(int)
+    
+        #Run pipelines
+        results.extend(run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, ts_thr, verbose, save))
 
-            print "\nDataSet:"
-            print "**********"
-            print "**********"
-            print "SIZE:", tr_thr
-            print "NAME:", name
-
-            print df_all.shape
-            print "ALL TRAIN:", X_train.shape
-            print "TRAIN:", "[0's:", np.sum(y_train==0), "1's:", np.sum(y_train==1), "]"
-            print "ALL TEST:", X_test.shape
-            print "TEST:", "[0's:", np.sum(y_test==0), "1's:", np.sum(y_test==1), "]"
-
-            for num_exp in range(pipeline.shape[0]):
-
-                # Run experiment
-                start = time.time()
-
-                #Prepare pipe_cls      
-                pipeline_cls = pipeline["pipe"].iloc[num_exp]
-                pipeline_params = pipeline["pipe_params"].iloc[num_exp]
-                fs = pipeline["fs"].iloc[num_exp]
-                sm = pipeline["sm"].iloc[num_exp]
-                cls = pipeline["cls"].iloc[num_exp]
-                lm = pipeline["metric"].iloc[num_exp]
-
-                print "\nNum experiment:", str(num_exp), "/", str(pipeline.shape[0] - 1)
-                print "****************"
-
-                print "FS:",fs
-                print "SM:",sm
-                print "CLS:",cls
-                print "METRIC:",lm
-
-                #Prepare cv
-                cv_inner = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=24)
-                cv_outer = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=42)
-
-                #Fit pipeline with CV                        
-                grid_pipeline = GridSearchCV(pipeline_cls, param_grid=pipeline_params, verbose=verbose, 
-                                             n_jobs=-1, cv=cv_inner, scoring= lm, error_score = 0) 
-                grid_pipeline.fit(X_train, y_train)
-                
-                
-                # Compute Train scores (with best CV params)
-                y_pred = grid_pipeline.best_estimator_.predict(X_train)  
-                train_f1_w = metrics.f1_score(y_train, y_pred, average='weighted', pos_label=None)
-                train_p, train_r, train_f1, train_s = metrics.precision_recall_fscore_support(y_train, y_pred,labels=None,average=None, sample_weight=None)
-                fpr, tpr, _ = metrics.roc_curve(y_train, y_pred)
-                train_auc = metrics.auc(fpr, tpr)                
-                cm_train = metrics.confusion_matrix(y_train, y_pred)
-                tn = cm_train[0,0]
-                fp = cm_train[0,1]
-                fn = cm_train[1,0]
-                tp = cm_train[1,1]
-                train_sens = train_r[1]
-                train_spec = tn / float(tn+fp)                
-                print "\nTRAIN f1 (weighted): %0.3f" % (train_f1_w)
-                print "TRAIN Precision [c=0,1]:", train_p
-                print "TRAIN Recall [c=0,1]:", train_r
-                print "TRAIN AUC: %0.3f" % (train_auc)                 
-                print "TRAIN sensitivity:", train_sens
-                print "TRAIN Specificity: ", train_spec
-                
-                # Compute evaluation scores
-                print "\nCV INNER metric: {}".format(lm)
-                print "CV INNER selected params {}".format(grid_pipeline.best_params_.values())
-                print "CV INNER score: {}".format(grid_pipeline.best_score_)
-
-                scorings = {'roc_auc': 'roc_auc',
-                            'f1_weighted':'f1_weighted',
-                            'precision_1':'precision',
-                            'recall_1':'recall',
-                            'precision_0' : metrics.make_scorer(precision_0),
-                            'recall_0' : metrics.make_scorer(recall_0),
-                            'spec': metrics.make_scorer(specificity)
-                           } 
-                
-                cv_scores = cross_validate(grid_pipeline.best_estimator_, X_train, y_train, 
-                                           cv=cv_outer, scoring=scorings, n_jobs=-1, 
-                                           return_train_score = False)
-
-                cv_f1_w_mean = np.mean(cv_scores["test_f1_weighted"])
-                cv_f1_w_std = np.std(cv_scores["test_f1_weighted"])
-                cv_p1_mean = np.mean(cv_scores["test_precision_1"])
-                cv_p1_std = np.std(cv_scores["test_precision_1"])
-                cv_r1_mean = np.mean(cv_scores["test_recall_1"])
-                cv_r1_std = np.std(cv_scores["test_recall_1"])                
-                cv_p0_mean = np.mean(cv_scores["test_precision_0"])
-                cv_p0_std = np.std(cv_scores["test_precision_0"])
-                cv_r0_mean = np.mean(cv_scores["test_recall_0"])
-                cv_r0_std = np.std(cv_scores["test_recall_0"])
-                
-                cv_auc_mean = np.mean(cv_scores["test_roc_auc"])
-                cv_auc_std = np.std(cv_scores["test_roc_auc"])                
-                cv_spec_mean = np.mean(cv_scores["test_spec"])
-                cv_spec_std = np.std(cv_scores["test_spec"])
-                cv_sens_mean = cv_r1_mean
-                cv_sens_std = cv_r1_std
-                
-                print "\nCV OUTER f1-weighted score: %0.3f  (+/-%0.03f)" % (cv_f1_w_mean,cv_f1_w_std)               
-                print "CV OUTER prec score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_p0_mean,cv_p0_std,cv_p1_mean,cv_p1_std)                
-                print "CV OUTER rec  score [c=0,1]: {:.3f} (+/- {:.3f}), {:.3f}  (+/- {:.3f})".format(cv_r0_mean,cv_r0_std,cv_r1_mean,cv_r1_std)
-                print "CV OUTER AUC score: %0.3f  (+/-%0.03f)" % (cv_auc_mean,cv_auc_std) 
-                print "CV OUTER sensitivity score: %0.3f  (+/-%0.03f)" % (cv_sens_mean,cv_sens_std) 
-                print "CV OUTER Specificity score: %0.3f  (+/-%0.03f)" % (cv_spec_mean,cv_spec_std)
-                print "Selected params (bests from CV) {}".format(grid_pipeline.best_params_.values())
-               
-
-                #Compute test scores
-                y_pred = grid_pipeline.best_estimator_.predict(X_test)
-                test_f1_w = metrics.f1_score(y_test, y_pred, average='weighted', pos_label=None)
-                test_p, test_r, test_f1, test_s = metrics.precision_recall_fscore_support(y_test, y_pred,labels=None,average=None, sample_weight=None)
-                fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
-                test_auc = metrics.auc(fpr, tpr)                
-                cm_test = metrics.confusion_matrix(y_test, y_pred)
-                tn = cm_test[0,0]
-                fp = cm_test[0,1]
-                fn = cm_test[1,0]
-                tp = cm_test[1,1]
-                test_sens = test_r[1]
-                test_spec = tn / float(tn+fp)
-                
-                print "\nTEST f1 (weighted): %0.3f" % (test_f1_w)
-                print "TEST Precision [c=0,1]:", test_p
-                print "TEST Recall [c=0,1]:", test_r                
-                print "TEST AUC: %0.3f" % (test_auc)                
-                print "TEST sensitivity:", test_sens
-                print "TEST Specificity:", test_spec
-                print "Confussion matrix:"
-                print "         | PRED"
-                print "REAL-->  v "
-                print cm_test
-
-                end = time.time()
-                print "\nTotal time:", end - start
-                
-                res = [num_exp,
-                       name,
-                       tr_thr,
-                       fs,
-                       sm,
-                       cls,
-                       lm,
-                       grid_pipeline.best_params_.values(),
-                       train_sens,
-                       train_spec,
-                       train_auc,
-                       train_r,
-                       train_p,
-                       train_f1_w,
-                       cv_sens_mean,
-                       cv_sens_std,
-                       cv_spec_mean,
-                       cv_spec_std,
-                       cv_auc_mean,
-                       cv_auc_std,
-                       [cv_p0_mean,cv_p1_mean],
-                       [cv_p0_std,cv_p1_std],
-                       [cv_r0_mean,cv_r1_mean],
-                       [cv_r1_std,cv_r0_std],
-                       cv_f1_w_mean,
-                       cv_f1_w_std,
-                       test_sens,
-                       test_spec,
-                       test_auc,
-                       test_r,
-                       test_p,
-                       test_f1_w,
-                       cm_test,              
-                       end - start,
-                       grid_pipeline.best_estimator_
-                      ]
-                results.append(res)
-
-                #Save results
-                if save:
-                    df = pd.DataFrame(np.array(res).reshape(1,35), columns=
-                          ["exp", "name",
-                           "size_tr","fs","sm","cls","metric","params",
-                           "tr_sens","tr_spec","tr_auc",
-                           "tr_prec","tr_rec","tr_f1",
-                           "cv_sens_mean","cv_sens_std","cv_spec_mean","cv_spec_std","cv_auc_mean","cv_auc_std",
-                           "cv_prec_mean","cv_prec_std","cv_rec_mean","cv_rec_std",
-                           "cv_f1_mean","cv_f1_std",
-                           "test_sens","test_spec","test_auc",
-                           "test_rec","test_prec","test_f1",
-                           "cm_test",
-                           "time","pipeline"])
-
-                    df.to_pickle(os.path.join("resources", "results",
-                                          'results_pipe_' + 
-                                          "test_" + str(ts_thr) + "_" +
-                                          "train_" + str(tr_thr) + "_" +
-                                          str(name) + '_' +
-                                          str(fs) + '_' +
-                                          str(sm) + '_' +
-                                          str(lm) + '_' +
-                                          str(cls) + '_' +
-                                          time.strftime("%Y%m%d-%H%M%S") +
-                                          '.pkl'))
     return results

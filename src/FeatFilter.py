@@ -12,5 +12,8 @@ class FeatFilter(BaseEstimator, TransformerMixin):
     def fit(self, X, y = None):    
         return self
 
-    def transform(self, X):      
-        return X[:,self.ixCols]
+    def transform(self, X):         
+        if self.ixCols is None:
+            return X
+        else:
+            return X[:,self.ixCols==1]

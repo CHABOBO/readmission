@@ -78,3 +78,82 @@ def filter_data_by_experiment(df_all, experiment):
                 df_all_filtered = df_all_filtered[[c for c in df_all_filtered.columns if c != curr_disease]]
     
     return df_all_filtered
+
+def create_filters(df):
+    featFilters = []
+    flt_0 = []
+    flt_1 = []
+    flt_2 = []
+    flt_3 = []
+    flt_4 = []
+    flt_5 = []
+    flt_6 = []
+    
+    patientCols = [u'gender', u'age', u'race_AfricanAmerican', u'race_Caucasian',u'race_Other']
+    admDisCols = patientCols[:]
+    admDisCols.extend([u'adm_src_1',
+       u'adm_src_2', u'adm_src_3', u'adm_src_4', u'adm_src_5', u'adm_src_6',
+       u'adm_src_7', u'adm_src_8', u'adm_src_10', u'adm_src_11', u'adm_src_13',
+       u'adm_src_14', u'adm_src_22', u'adm_src_25', u'adm_1', u'adm_2',
+       u'adm_3', u'adm_4', u'adm_7',u'medSpec_cardio', u'medSpec_Family/GeneralPractice',
+       u'medSpec_InternalMedicine', u'medSpec_surgery',"diss_home"])
+    hospitalCols = patientCols[:]
+    hospitalCols.extend([u'num_lab_procedures', u'num_procedures',u'time_in_hospital',u'HbA1c'])
+    visitCols = patientCols[:]
+    visitCols.extend([u'number_outpatient', u'number_emergency', u'number_inpatient'])
+    diagCols = patientCols[:]
+    diagCols.extend([ u'number_diagnoses',u'Diabetis_3', u'Circulatory_3', u'Digestive_3',
+       u'Genitourinary_3', u'Poisoning_3', u'Muscoskeletal_3', u'Neoplasms_3',
+       u'Respiratory_3'])
+    medCols = patientCols[:]
+    medCols.extend([u'insulin', u'metformin', u'pioglitazone',
+       u'glimepiride', u'glipizide', u'repaglinide', u'nateglinide', 
+       u'Change', u'num_medications', u'diabetesMed'])
+    
+    for i in range(len(df.columns[:-1])):
+        
+        #Patient filter
+        if df.columns[i] in patientCols:
+            flt_0.append(1)
+        else:
+            flt_0.append(0)
+    
+        #Patient admission-discharge
+        if df.columns[i] in admDisCols:
+            flt_1.append(1)
+        else:
+            flt_1.append(0)
+          
+        #Patient hospital
+        if df.columns[i] in hospitalCols:
+            flt_2.append(1)
+        else:
+            flt_2.append(0)
+            
+        #Patient visits
+        if df.columns[i] in visitCols:
+            flt_3.append(1)
+        else:
+            flt_3.append(0)
+            
+        #Patient diagnosis
+        if df.columns[i] in diagCols:
+            flt_4.append(1)
+        else:
+            flt_4.append(0)
+            
+        #Patient admission
+        if df.columns[i] in medCols:
+            flt_5.append(1)
+        else:
+            flt_5.append(0)
+            
+        #None filter
+        flt_6.append(1)
+        
+    featFilters = [["patient_filter",np.array(flt_0)],["admision_discharge_filter", np.array(flt_1)],
+                   ["hospital_filter",np.array(flt_2)],["Visits_filter",np.array(flt_3)],
+                   ["diagnosis_filter",np.array(flt_4)],["medicines_filter",np.array(flt_5)],
+                   ["none_filter",np.array(flt_6)]]
+    
+    return featFilters
