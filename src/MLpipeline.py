@@ -186,7 +186,7 @@ def specificity(ground_truth, predictions):
 
 
 # One Experiment One file
-def run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, tr_thr=1.0, ts_thr=0.3, cv_folds=5, cv_thr=0.3, verbose=True, save=True):
+def run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, tr_thr=1.0, ts_thr=0.3, cv_inner=10, cv_outer=10, verbose=True, save=True):
     
     results = []
 
@@ -222,9 +222,6 @@ def run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, tr_thr=1.0, t
         print "CLS:",cls
         print "METRIC:",lm
 
-        #Prepare cv
-        cv_inner = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=24)
-        cv_outer = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=42)
 
         #Fit pipeline with CV                        
         grid_pipeline = GridSearchCV(pipeline_cls, param_grid=pipeline_params, verbose=verbose, 
@@ -407,7 +404,11 @@ def run(name,df_all, catCols, reducedCols, hyperparams, ts_thr, tr_thrs, fs_meth
         y_train = y_train.astype(int)
         y_test = y_test.astype(int)
     
+        #Prepare cv
+        cv_inner = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=24)
+        cv_outer = StratifiedShuffleSplit(y_train, n_iter=cv_folds, test_size=cv_thr, random_state=42)
+    
         #Run pipelines
-        results.extend(run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, ts_thr, verbose, save))
+        results.extend(run_pipeline(name, pipeline, X_train, X_test, y_train, y_test, tr_thr, ts_thr, cv_inner, cv_outer, verbose, save))
 
     return results

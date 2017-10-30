@@ -25,7 +25,7 @@ def filter_data_by_class(df_all, typeHypothesis):
         
     return df_all
 
-def compute_type_features(df_all):
+def compute_type_features(cols):
 
     numCols = ['add_in_out', 'add_procs_meds', 'div_visits_time', 'div_em_time', 'div_visit_med', 
                'div_em_med',"sum_ch_med",
@@ -34,7 +34,6 @@ def compute_type_features(df_all):
                'number_treatment','number_treatment_0','number_treatment_1','number_treatment_2','number_treatment_3']
     
     catCols = []
-    cols = df_all.columns
     reducedCols = cols[:-1]
 
     for i in range(len(cols)-1):
