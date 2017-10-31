@@ -88,29 +88,55 @@ def create_filters(df):
     flt_5 = []
     flt_6 = []
     flt_7 = []
+    flt_8 = []
+    flt_9 = []
     
     patientCols = [u'gender', u'age', u'race_AfricanAmerican', u'race_Caucasian',u'race_Other']
+    
     admDisCols = patientCols[:]
     admDisCols.extend([u'adm_src_1',
+       u'adm_src_2', u'adm_src_3', u'adm_src_4', u'adm_src_5', u'adm_src_6',
+       u'adm_src_7', u'adm_src_8', u'adm_src_10', u'adm_src_11', u'adm_src_13',
+       u'adm_src_14', u'adm_src_22', u'adm_src_25'])
+    
+    admDisCols_1 = patientCols[:]
+    admDisCols_1.extend([u'adm_1', u'adm_2',
+       u'adm_3', u'adm_4', u'adm_7'])
+    
+    admDisCols_2 = patientCols[:]
+    admDisCols_2.extend([u'medSpec_cardio', u'medSpec_Family/GeneralPractice',
+       u'medSpec_InternalMedicine', u'medSpec_surgery',"diss_home"])    
+    
+    admDisCols_3 = patientCols[:]
+    admDisCols_3.extend([u'adm_src_1',
        u'adm_src_2', u'adm_src_3', u'adm_src_4', u'adm_src_5', u'adm_src_6',
        u'adm_src_7', u'adm_src_8', u'adm_src_10', u'adm_src_11', u'adm_src_13',
        u'adm_src_14', u'adm_src_22', u'adm_src_25', u'adm_1', u'adm_2',
        u'adm_3', u'adm_4', u'adm_7',u'medSpec_cardio', u'medSpec_Family/GeneralPractice',
        u'medSpec_InternalMedicine', u'medSpec_surgery',"diss_home"])
+    
     hospitalCols = patientCols[:]
     hospitalCols.extend([u'num_lab_procedures', u'num_procedures',u'time_in_hospital',u'HbA1c'])
+    
     visitCols = patientCols[:]
     visitCols.extend([u'number_outpatient', u'number_emergency', u'number_inpatient'])
+    
     diagCols = patientCols[:]
     diagCols.extend([ u'number_diagnoses',u'Diabetis_3', u'Circulatory_3', u'Digestive_3',
        u'Genitourinary_3', u'Poisoning_3', u'Muscoskeletal_3', u'Neoplasms_3',
        u'Respiratory_3'])
+    
     medCols = patientCols[:]
     medCols.extend([u'insulin', u'metformin', u'pioglitazone',
        u'glimepiride', u'glipizide', u'repaglinide', u'nateglinide', 
        u'Change', u'num_medications', u'diabetesMed'])
+    
     extraCols = patientCols[:]
     extraCols.extend(['ComplexHbA1c', 'add_in_out', 'add_procs_meds', 'div_visits_time', 'div_em_time', 'div_visit_med', 'div_em_med', 'sum_ch_med', 'number_treatment_0', 'number_treatment_1', 'number_treatment_2', 'number_treatment_3'])
+    
+    selectCols = [u'age', u'race_AfricanAmerican', u'race_Caucasian',u'number_inpatient',u'HbA1c', u'diabetesMed',
+                  "diss_home",u'adm_src_7',u'adm_1',u'adm_3',u'adm_7',u'number_diagnoses','div_em_time', 'div_visit_med',
+                  u'Circulatory_3','sum_ch_med','add_in_out']
     
     for i in range(len(df.columns[:-1])):
         
@@ -121,7 +147,7 @@ def create_filters(df):
             flt_0.append(0)
     
         #Patient admission-discharge
-        if df.columns[i] in admDisCols:
+        if df.columns[i] in admDisCols_3:
             flt_1.append(1)
         else:
             flt_1.append(0)
@@ -157,11 +183,26 @@ def create_filters(df):
         if df.columns[i] in extraCols:
             flt_7.append(1)
         else:
-            flt_7.append(0)        
+            flt_7.append(0)
+            
+        #Patient none diagnosis
+        if df.columns[i] not in [u'Diabetis_3', u'Circulatory_3', u'Digestive_3',
+       u'Genitourinary_3', u'Poisoning_3', u'Muscoskeletal_3', u'Neoplasms_3',
+       u'Respiratory_3']:
+            flt_8.append(1)
+        else:
+            flt_8.append(0)
+
+        #Patient selected
+        if df.columns[i] in selectCols:
+            flt_9.append(1)
+        else:
+            flt_9.append(0)            
         
     featFilters = [["patient_filter",np.array(flt_0)],["admision_discharge_filter", np.array(flt_1)],
                    ["hospital_filter",np.array(flt_2)],["Visits_filter",np.array(flt_3)],
                    ["diagnosis_filter",np.array(flt_4)],["medicines_filter",np.array(flt_5)],
-                   ["extra_filter",np.array(flt_6)],["none_filter",np.array(flt_7)]]
+                   ["extra_filter",np.array(flt_6)],["none_filter",np.array(flt_7)], 
+                   ["no_diagnosis_filter",np.array(flt_8)],["selected_filter",np.array(flt_9)]]
     
     return featFilters
