@@ -87,6 +87,7 @@ def create_filters(df):
     flt_4 = []
     flt_5 = []
     flt_6 = []
+    flt_7 = []
     
     patientCols = [u'gender', u'age', u'race_AfricanAmerican', u'race_Caucasian',u'race_Other']
     admDisCols = patientCols[:]
@@ -108,6 +109,8 @@ def create_filters(df):
     medCols.extend([u'insulin', u'metformin', u'pioglitazone',
        u'glimepiride', u'glipizide', u'repaglinide', u'nateglinide', 
        u'Change', u'num_medications', u'diabetesMed'])
+    extraCols = patientCols[:]
+    extraCols.extend(['ComplexHbA1c', 'add_in_out', 'add_procs_meds', 'div_visits_time', 'div_em_time', 'div_visit_med', 'div_em_med', 'sum_ch_med', 'number_treatment_0', 'number_treatment_1', 'number_treatment_2', 'number_treatment_3'])
     
     for i in range(len(df.columns[:-1])):
         
@@ -150,9 +153,15 @@ def create_filters(df):
         #None filter
         flt_6.append(1)
         
+        #Patient extra
+        if df.columns[i] in extraCols:
+            flt_7.append(1)
+        else:
+            flt_7.append(0)        
+        
     featFilters = [["patient_filter",np.array(flt_0)],["admision_discharge_filter", np.array(flt_1)],
                    ["hospital_filter",np.array(flt_2)],["Visits_filter",np.array(flt_3)],
                    ["diagnosis_filter",np.array(flt_4)],["medicines_filter",np.array(flt_5)],
-                   ["none_filter",np.array(flt_6)]]
+                   ["extra_filter",np.array(flt_6)],["none_filter",np.array(flt_7)]]
     
     return featFilters

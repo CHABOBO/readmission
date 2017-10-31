@@ -15,8 +15,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB, GaussianNB
 
-from sklearn.grid_search import GridSearchCV, ParameterGrid
+from sklearn.model_selection import GridSearchCV, ParameterGrid
 from sklearn.preprocessing import StandardScaler
+from sklearn.externals.joblib import Memory
+from tempfile import mkdtemp
 
 from imblearn.over_sampling import SMOTE,ADASYN, RandomOverSampler
 from imblearn.pipeline import Pipeline
@@ -148,6 +150,12 @@ def create_pipelines(catCols,reducedCols, hyperparams, fs_methods, sm_method, sm
 
                         #Add sampling
                         pipe_imb = make_pipeline(*[p[1] for p in pipe.steps])
+                        
+                        # Create a temporary folder to store the transformers of the pipeline
+                        cachedir = mkdtemp()
+                        memory = Memory(cachedir=cachedir, verbose=0)                        
+                        pipe_imb.memory = memory
+                        
                         stps = len(pipe_imb.steps)        
                         for s in range(stps):
                             pipe_imb.steps.remove(pipe_imb.steps[0])
